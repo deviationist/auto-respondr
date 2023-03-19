@@ -3,58 +3,125 @@ import { rmSync, writeFileSync, existsSync, readFileSync } from 'fs';
 import { clearIntervalAsync, setIntervalAsync } from 'set-interval-async';
 
 let page;
-let screenshotInterval;;
+let browser;
+let screenshotInterval;
+let activeConversation;
+
 const debug = true;
-const loginUrl = 'https://www.messenger.com/';
+const baseUrl = 'https://www.messenger.com';
 const takeScreenshots = true;
-let activeConversationName;
-const messageCheckIntervalInMs = 1000;
+const messageCheckIntervalInMs = 3000;
 const screenshotFilePath = process.cwd() + '/screenshots';
 
-process.on('SIGTERM', async () => {
-    if (debug) console.log('SIGTERM received.')
-    await shutDown();
-});
-
 export async function startLooking() {
+
     await initializeBrowser();
     if (takeScreenshots) startTakingScreenshots();
-    await page.goto(loginUrl, { waitUntil: 'networkidle' });
+
+    await page.goto(loginUrl(), { waitUntil: 'networkidle' });
     await ensureAcceptCookies();
     await ensureLoggedIn();
+
+    activeConversation = await getActiveConversation();
+    if (debug) console.log(`Active conversation is ${activeConversation.name} (${activeConversation.id}${activeConversation.isGroupChat ? ', group chat' : ''})`);
+
+    /*
+    console.log('Successfully changed conversation to ', await loadConversation('/t/749288873', 'Maria Strand'));
+    console.log('New active conversation is ', await getActiveConversation());
+
+    console.log('Successfully changed conversation to ', await loadConversation('/t/6171719659562121', 'Robert, Daelyn Temperance'));
+    console.log('New active conversation is ', await getActiveConversation());
+    */
+
     if (debug) console.log('Looking for unread messages...');
     setIntervalAsync(async () => {
         await lookForNewMessages();
     },  messageCheckIntervalInMs);
 }
 
+function loadConversation(href, navigationName) {
+    page.goto(conversationUrl(href), { waitUntil: 'networkidle' });
+    const navigationId = extractIdFromUrl(href);
+    return new Promise((resolve, reject) => {
+        const interval = setIntervalAsync(async () => {
+            const id = extractIdFromUrl(await page.url());
+            const name = await getCurrentNameFromConversation();
+            if (navigationName == name && navigationId == id) {
+                resolve({ id, name });
+            }
+        }, 1000);
+        setTimeout(() => {
+            clearIntervalAsync(interval);
+            reject();
+        }, 8000);
+    });
+}
+
+function getActiveConversation() {
+    return new Promise((resolve, reject) => {
+        const interval = setIntervalAsync(async () => {
+            const id = extractIdFromUrl(await page.url());
+            const name = await getCurrentNameFromConversation();
+            const sidebarIsLoaded = await currentConversationSidebarIsLoaded();
+            const isGroupChat = sidebarIsLoaded ? await currentConversationIsGroupChat() : null;
+            if (name && sidebarIsLoaded && typeof isGroupChat == 'boolean') {
+                resolve({ id, name, isGroupChat });
+            }
+        }, 1000);
+        setTimeout(() => {
+            clearIntervalAsync(interval);
+            reject();
+        }, 8000);
+    });
+}
+
 async function lookForNewMessages() {
-    await checkForNewMessagesInActiveConversation();
+    //await checkForNewMessagesInActiveConversation();
     await checkForNewMessagesInConversationList();
 }
 
-function setActiveConversation(name) {
-    activeConversationName = name;
-    if (debug) console.log(`Active conversation: ${name}`);
+/*
+function setActiveConversation(id, name) {
+    activeConversation = { id, name };
+    if (debug) console.log(`Active conversation: ${name} (${id})`);
 }
+*/
 
 /**
  * Catch new messages in active conversation.
  */
 async function checkForNewMessagesInActiveConversation() {
-    const conversationContainer = await getConversationContainer();
-    if (conversationContainer && await lastMessageIsFromRecipient(conversationContainer)) {
-        const personName = await getCurrentNameFromConversation(conversationContainer);
-        setActiveConversation(personName);
+    // TODO: Ignore if this is group chat
+    if (await lastMessageIsFromRecipient()) {
+        const personName = await getCurrentNameFromConversation();
+        //setActiveConversation(personName);
         if (personName) {
             if (debug) console.log(`New message from ${personName} (in active conversation)`);
-            sendMessage(conversationContainer, generateMessage(personName));
+            sendMessage(generateMessage(personName));
         }
     }
 }
 
-function conversationAlreadyActive(currentConversationName) {
-    return activeConversationName && activeConversationName == currentConversationName;
+function conversationAlreadyActive(currentConversationId) {
+    return activeConversation && activeConversation?.id == currentConversationId;
+}
+
+async function currentConversationIsGroupChat() {
+    const sidebarText = await getCurrentConversationSidebarText();
+    return sidebarText.includes('Chat members');
+}
+
+async function currentConversationSidebarIsLoaded() {
+    const sidebarText = await getCurrentConversationSidebarText();
+    return sidebarText != '';
+}
+
+async function getCurrentConversationSidebarText() {
+    const sidebarContainer = await getSidebarContainer();
+    if (sidebarContainer) {
+        return await sidebarContainer.innerText();
+    }
+    return '';
 }
 
 /**
@@ -67,13 +134,13 @@ async function checkForNewMessagesInConversationList() {
             continue;
         }
         if (debug) console.log(`New message from ${unreadConversation.name}`);
-        const row = await page.$(`[role="gridcell"] > a[href="${href}"]`);
+        const row = await page.$(`[role="gridcell"] > a[href="${unreadConversation.href}"]`);
         row.click();
         let waitForTabToLoad = setIntervalAsync(async () => {
             const conversationContainer = await getConversationContainer();
-            const conversationName = await getCurrentNameFromConversation(conversationContainer);
+            const conversationName = await getCurrentNameFromConversation();
             if (conversationName && unreadConversation.name == conversationName) {
-                setActiveConversation(unreadConversation.name);
+                //setActiveConversation(unreadConversation.name);
                 clearIntervalAsync(waitForTabToLoad);
                 sendMessage(conversationContainer, generateMessage(unreadConversation.name));
             }
@@ -81,35 +148,63 @@ async function checkForNewMessagesInConversationList() {
     }
 }
 
+function loginUrl() {
+    return `${baseUrl}/`;
+}
+
+function conversationUrl(href) {
+    return `${baseUrl}${href}`;
+}
+
+async function getUnreadConversations() {
+    return (await getConversations()).filter(row => row.isUnread === true);
+}
+
+async function isGroupChat(row) {
+    const images = await row.$$('div[role="img"] img');
+    if (images.length >= 2) {
+        return true;
+    }
+    const image = images[0];
+    const altText = await image.getAttribute('alt');
+    const regex = new RegExp('(, | and )');
+    return regex.test(altText);
+}
+
 /**
  * Get unread messages from conversation list.
  * 
  * @returns 
  */
-async function getUnreadConversations() {
+async function getConversations() {
     const unreadMessages = [];
-    const conversations = await getConversations();
+    const conversations = await getConversationRows();
     for (const conversationRow of conversations) {
         const nameContainer = await conversationRow.$('span > span > span');
-        if (nameContainer && await isUnread(nameContainer)) {
+        if (nameContainer) {
             const personName = await nameContainer.innerText();
             const href = await conversationRow.getAttribute('href');
-            const id = extractIdFromHref(href);
+            const id = extractIdFromUrl(href);
             unreadMessages.push({
                 id,
                 href,
                 name: personName,
+                isGroupChat: await isGroupChat(conversationRow),
+                isUnread: await isUnread(nameContainer)
             });
         }
     }
-    return unreadMessages
+    return unreadMessages;
 }
 
 export async function shutDown() {
     if (takeScreenshots) {
-        clearIntervalAsync(screenshotInterval);
+        if (screenshotInterval) {
+            clearIntervalAsync(screenshotInterval);
+        }
         await page.screenshot({ path: `${screenshotFilePath}/final.png` });
     }
+    await page.close();
     await browser.close();
 }
 
@@ -119,21 +214,22 @@ export async function shutDown() {
  * @param {*} conversationContainer 
  * @returns 
  */
-async function lastMessageIsFromRecipient(conversationContainer) {
+async function lastMessageIsFromRecipient() {
+    const conversationContainer = await getConversationContainer();
     const lastMessageText = await getLastMessageText(conversationContainer);
     const isFromYou = lastMessageText.includes('You sent');
     return !isFromYou;
 }
 
 /**
- * Extract ID from conversation href.
+ * Extract ID from URL.
  * 
  * @param {*} href 
  * @returns 
  */
-function extractIdFromHref(href) {
+function extractIdFromUrl(href) {
     try {
-        const regex = new RegExp('\/t\/(.*)\/');
+        const regex = new RegExp('\/t\/([^/]*)(|\/)$');
         const matches = href.match(regex);
         return matches[1];
     } catch(e) {
@@ -163,7 +259,7 @@ async function getLastMessageText(conversationContainer) {
  * 
  * @returns 
  */
-async function getConversations() {
+async function getConversationRows() {
     return await page.$$('div[aria-label="Chats"] [role="gridcell"] > a');
 }
 
@@ -173,7 +269,8 @@ async function getConversations() {
  * @param {*} conversationContainer 
  * @param {*} message 
  */
-async function sendMessage(conversationContainer, message) {
+async function sendMessage(message) {
+    const conversationContainer = await getConversationContainer();
     const messageInput = await conversationContainer.$('[aria-label="Message"]');
     await messageInput.fill(message);
     (await conversationContainer.$('[aria-label="Press enter to send"]')).click();
@@ -192,11 +289,20 @@ async function isUnread(nameSpan) {
     return fontWeight === '700';
 }
 
-async function getConversationContainer() {
-    return await page.$('div[aria-label*="Conversation with"]');
+async function getSidebarContainer() {
+    const conversationContainer = await getConversationContainer();
+    if (conversationContainer) {
+        return conversationContainer.$('> div > div > div:last-child');
+    }
+    return false;
 }
 
-async function getCurrentNameFromConversation(conversationContainer) {
+async function getConversationContainer() {
+    return page.$('div[aria-label*="Conversation with"][role="main"]');
+}
+
+async function getCurrentNameFromConversation() {
+    const conversationContainer = await getConversationContainer();
     if (conversationContainer) {
         const nameContainer = await conversationContainer.$('h1 > span > span')
         return await nameContainer.innerText();
@@ -257,6 +363,7 @@ async function ensureLoggedIn() {
     } else {
         await page.type('input[name="email"]', process.env.FACEBOOK_EMAIL);
         await page.type('input[name="pass"]', process.env.FACEBOOK_PASSWORD);
+        await page.getByText('Keep me signed in').click();
         await page.click('button[name="login"]');
     }
     if (!await isLoggedIn()) {
@@ -270,7 +377,7 @@ async function ensureLoggedIn() {
 function startTakingScreenshots() {
     rmSync(screenshotFilePath, { recursive: true, force: true });
     let count = 0;
-    screenshotInterval = setInterval(() => {
+    screenshotInterval = setIntervalAsync(() => {
         page.screenshot({ path: `${screenshotFilePath}/${count}.png` });
         count++;
     }, 100);
@@ -297,7 +404,7 @@ function getUserAgent() {
 }
 
 async function initializeBrowser() {
-    const browser = await playwright.chromium.launch();
+    browser = await playwright.chromium.launch();
     const userAgent = getUserAgent();
     if (debug) console.log(`Using user agent "${userAgent}".`)
     const context = await browser.newContext({
