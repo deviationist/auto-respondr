@@ -8,8 +8,9 @@ export default class AuthHandler extends Shared {
     }
 
     async ensureCookiesAreAccepted() {
-        if (await this.page.isVisible('text="Only allow essential cookies"')) {
-            await this.page.getByText('Only allow essential cookies').click();
+        const text = 'Only allow essential cookies';
+        if (await this.page.isVisible(`text="${text}"`)) {
+            await this.page.getByText(text).click();
         }
     }
 
