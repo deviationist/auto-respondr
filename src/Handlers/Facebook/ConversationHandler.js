@@ -1,4 +1,4 @@
-import Shared from './Shared.js';
+import Shared from '../Shared.js';
 
 export default class ConversationHandler extends Shared {
 

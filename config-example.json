@@ -1,0 +1,44 @@
+{
+    "users": [
+        {
+            "username": "your@mail.com",
+            "password": "your-password",
+            "service": "facebook",
+            "active": true,
+            "message": {
+                "greetingWords": ["Howdy", "Hi there"],
+                "base": "I've stopped using messenger. Please contact me on...",
+                "andWord": "&"
+            }
+        },
+        {
+            "username": "your@mail.com",
+            "password": "your-password",
+            "service": "instagram",
+            "active": true
+        }
+    ],
+    "browser": {
+        "locale": "en-US",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
+    },
+    "message": {
+        "greetingWords": ["Hello", "Hey"],
+        "base": "I've stopped using this service. Please contact me on...",
+        "andWord": "and"
+    },
+    "services": {
+        "facebook": {
+            "ignoreGroupChats": false,
+            "onlyReplyOnce": true
+        },
+        "instagram": {
+            "ignoreGroupChats": false,
+            "onlyReplyOnce": true,
+            "message": {
+                "greetingWords": ["Hi", "G'day"],
+                "base": "I've stopped using Instagram. Please contact me on...",
+            }
+        }
+    }
+}

@@ -1,13 +1,44 @@
-import Shared from './Shared.js';
+import Shared from '../Shared.js';
 import asap from 'asap';
-import Conversation from '../Conversation.js';
+import Conversation from './Conversation.js';
+import ConversationLog from '../../Model/ConversationLog.js';
+import Url from './Url.js';
+import Config from '../../Model/Config.js';
+import { useDb } from '../../Helpers.js';
 
 export default class ConversationsListHandler extends Shared {
+    user;
+    constructor(page, user) {
+        super(page);
+        this.user = user;
+    }
+
+    async goToConversations() {
+        await this.page.goto(Url.conversationsUrl(), { waitUntil: 'networkidle' });
+    }
+
+    async hasReply(conversationId) {
+        const count = await ConversationLog.countReplies(this.user.id, conversationId);
+        return count > 0;
+    }
+
+    async shouldReply(conversation) {
+        if (conversation.isGroupChat && Config.get('services.instagram.ignoreGroupChats') === true) {
+            return false;
+        }
+        if (useDb() && Config.get('services.instagram.onlyReplyOnce') === true && await this.hasReply(conversation.id)) {
+            return false;
+        }
+        return true;
+    }
+
     async lookForUnreadMessages(cb) {
         for (const unreadConversation of await this.getUnreadConversations()) {
-            asap(async () => {
-                await cb(unreadConversation);
-            });
+            if (await this.shouldReply(unreadConversation)) {
+                asap(async () => {
+                    await cb(unreadConversation);
+                });
+            }
         }
     }
 

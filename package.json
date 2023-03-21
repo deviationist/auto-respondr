@@ -1,15 +1,27 @@
 {
+  "name": "auto-respondr",
+  "engines": {
+    "node": ">=18"
+  },
+  "main": "./src/index.js",
   "type": "module",
   "dependencies": {
     "asap": "^2.0.6",
     "dotenv": "^16.0.3",
+    "mongoose": "^7.0.2",
     "node-cron": "^3.0.2",
     "nodemon": "^2.0.21",
-    "playwright": "^1.29.1",
+    "playwright": "^1.31.2",
     "set-interval-async": "^3.0.2"
   },
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon --watch src src/index.js"
+    "dev": "nodemon --watch src src/index.js",
+    "db-connection-string": "node ./ci/db-connection.js",
+    "db-setup": "./ci/mongo-setup.sh",
+    "db-cleanup": "./ci/mongo-cleanup.sh",
+    "add-user": "node ./ci/add-user.js",
+    "add-message": "node ./ci/add-message.js",
+    "delete-user": "node ./ci/delete-user.js"
   }
 }

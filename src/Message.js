@@ -1,29 +1,57 @@
-export class Message {
-    static getGreetingWord() {
-        const helloStrings = process.env.HELLO_ALTERNATIVES.split(',').map(e => e.trim());
-        const randomKey = Math.floor(Math.random() * helloStrings.length);
-        return helloStrings[randomKey];
-    }
-    
-    static getMessageBase() {
-        return process.env.MESSAGE_BASE;
-    }
-    
-    static getFirstName(name) {
-        return name.split(' ')[0];
+import Config from './Model/Config.js';
+
+export default class Message {
+    user;
+    constructor(user) {
+        this.user = user;
     }
 
-    static getNameString(conversation) {
+    getGreetingWordArray() {
+        return this.getInheritedFromConfig('greetingWords').map(e => e.trim());
+    }
+
+    getGreetingWord() {
+        const greetingWordsArray = this.getGreetingWordArray();
+        const randomKey = Math.floor(Math.random() * greetingWordsArray.length);
+        return greetingWordsArray[randomKey];
+    }
+    
+    getMessageBase() {
+        return this.getInheritedFromConfig('base');
+    }
+
+    getAndWord() {
+        return this.getInheritedFromConfig('andWord');
+    }
+
+    getInheritedFromConfig(key) {
+        const fromUser = this.user.getMessage(key);
+        if (fromUser) {
+            return fromUser;
+        }
+        const fromService = Config.get(`services.${this.user.service}.message.${key}`);
+        if (fromService) {
+            return fromService;
+        }
+        return Config.get(`message.${key}`);
+    }
+
+    getNameString(conversation) {
         if (conversation.isGroupChat) {
             const names = conversation.names.map(e => Message.getFirstName(e));
             const last = names.pop();
-            return `${names.join(', ')} ${process.env.MESSAGE_AND_WORD} ${last}`;
+            return `${names.join(', ')} ${this.getAndWord()} ${last}`;
         } else {
             return Message.getFirstName(conversation.name);
         }
     }
+
+    static getFirstName(name) {
+        return name.split(' ')[0];
+    }
     
-    static generate(conversation) {
-        return`${Message.getGreetingWord()} ${Message.getNameString(conversation)}! ${Message.getMessageBase()}`;
+    static generate(conversation, user) {
+        const instance = new Message(user);
+        return`${instance.getGreetingWord()} ${instance.getNameString(conversation)}! ${instance.getMessageBase()}`;
     }
 }
