@@ -1,5 +1,3 @@
-import Url from './Url.js';
-
 export default class Conversation {
     id;
     href;
@@ -9,7 +7,7 @@ export default class Conversation {
     isGroupChat;
     isUnread;
 
-    constructor(href, name, isGroupChat, isUnread) {
+    constructor(href, name, isGroupChat, isUnread, Url) {
         if (isGroupChat) {
             this.names = this.extractNames(name);
         }

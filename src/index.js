@@ -2,7 +2,7 @@ import * as dotenv from 'dotenv';
 import { databaseConnect } from './Database.js';
 import User from './Model/User.js';
 import { useDb } from './Helpers.js';
-import UserHandler from './Handlers/UserHandler.js';
+import Handle from './Services/Handle.js';
 dotenv.config();
 
 async function start() {
@@ -11,7 +11,7 @@ async function start() {
         console.log('No users.');
         process.exit(1);
     }
-    users.map(user => new UserHandler(user))
+    users.map(user => new Handle(user))
 }
 
 if (useDb()) await databaseConnect();

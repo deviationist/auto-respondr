@@ -1,7 +1,7 @@
-import FacebookHandler from './Facebook/MainHandler.js';
-import InstagramHandler from './Instagram/MainHandler.js';
+import FacebookHandler from './Facebook/Facebook.js';
+import InstagramHandler from './Instagram/Instagram.js';
 
-export default class UserHandler {
+export default class Handle {
     constructor(user) {
         const handlerClass = this.resolveHandlerClass(user);
         if (handlerClass) {

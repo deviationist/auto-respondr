@@ -1,6 +1,6 @@
-import Url from './Url.js';
-import Shared from '../Shared.js';
-import { naturalDelay } from '../../Helpers.js';
+import Url from '../Url.js';
+import Shared from '../../Shared.js';
+import { naturalDelay } from '../../../Helpers.js';
 
 export default class AuthHandler extends Shared {
     user;

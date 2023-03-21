@@ -1,10 +1,10 @@
-import Shared from '../Shared.js';
+import Shared from '../../Shared.js';
 import asap from 'asap';
-import Conversation from './Conversation.js';
-import ConversationLog from '../../Model/ConversationLog.js';
-import Url from './Url.js';
-import Config from '../../Model/Config.js';
-import { useDb } from '../../Helpers.js';
+import Conversation from '../../../Conversation.js';
+import ConversationLog from '../../../Model/ConversationLog.js';
+import Url from '../Url.js';
+import Config from '../../../Model/Config.js';
+import { useDb } from '../../../Helpers.js';
 
 export default class ConversationsListHandler extends Shared {
     user;
@@ -12,7 +12,7 @@ export default class ConversationsListHandler extends Shared {
         super(page);
         this.user = user;
     }
-    
+
     async goToConversations() {
         await this.page.goto(Url.conversationsUrl(), { waitUntil: 'networkidle' });
     }
@@ -31,7 +31,7 @@ export default class ConversationsListHandler extends Shared {
         }
         return true;
     }
-    
+
     async lookForUnreadMessages(cb) {
         for (const unreadConversation of await this.getUnreadConversations()) {
             if (await this.shouldReply(unreadConversation)) {
@@ -47,13 +47,13 @@ export default class ConversationsListHandler extends Shared {
     }
 
     async getConversationRows() {
-        return await this.page.$$(`a[role="link"][href*="${Url.conversationBaseUri}"]`);
+        return await this.page.$$('div[aria-label="Chats"] [role="gridcell"] > a');
     }
 
     async getConversations() {
         const unreadMessages = [];
         for (const conversationRow of await this.getConversationRows()) {
-            const nameContainer = await conversationRow.$('> div > div > div > *:nth-of-type(2) > div > div > div');
+            const nameContainer = await conversationRow.$('span > span > span');
             if (nameContainer) {
                 const params = {
                     href: await conversationRow.getAttribute('href'),
@@ -61,32 +61,27 @@ export default class ConversationsListHandler extends Shared {
                     isGroupChat: await this.conversationIsGroupChat(conversationRow),
                     isUnread: await this.conversationIsUnread(nameContainer)
                 };
-                unreadMessages.push(new Conversation(...Object.values(params)));
+                unreadMessages.push(new Conversation(...Object.values(params), Url));
             }
         }
         return unreadMessages;
     }
 
     async conversationIsGroupChat(row) {
-        const images = await row.$$('img[alt*="\'s profile picture"]')
-        return images.length >= 2;
+        const images = await row.$$('div[role="img"] img');
+        if (images.length >= 2) {
+            return true;
+        }
+        const image = images[0];
+        const altText = await image.getAttribute('alt');
+        const regex = new RegExp('(, | and )');
+        return regex.test(altText);
     }
 
-    async conversationIsUnread(nameContainer) {
-        let currentElement = nameContainer;
-        let finalElement;
-        do {
-            const attempt = await currentElement.$('> *:first-child');
-            if (attempt) {
-                currentElement = attempt;
-            } else {
-                finalElement = currentElement;
-                currentElement = false;
-            }
-        } while(currentElement);
-        const fontWeight = await finalElement.evaluate((element) =>
+    async conversationIsUnread(nameSpan) {
+        const fontWeight = await nameSpan.evaluate((element) =>
             window.getComputedStyle(element).getPropertyValue('font-weight'),
         );
-        return fontWeight === '600';
+        return fontWeight === '700';
     }
 }
