@@ -3,6 +3,7 @@ import { databaseConnect } from '../src/Database.js';
 import UserSchema from '../src/DatabaseSchema/User.js';
 import User from '../src/Model/User.js';
 import { handlers } from '../src/Enum.js';
+import { useDb } from '../src/Helpers.js';
 dotenv.config();
 
 await databaseConnect();
@@ -24,14 +25,18 @@ if (await User.exists(username, service)) {
     process.exit(1);
 }
 
-const user = await UserSchema.create({
+const user = await User.create({
     username,
     password,
     service
 });
 
 if (user) {
-    console.log(`User added (ID ${user._id.toString()})!`);
+    if (useDb()) {
+        console.log(`User added (ID ${user._id.toString()})!`);
+    } else {
+        console.log('User added!');
+    }
     process.exit(0);
 } else {
     console.log('Could not create user');

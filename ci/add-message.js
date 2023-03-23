@@ -3,6 +3,7 @@ import { databaseConnect } from '../src/Database.js';
 import UserSchema from '../src/DatabaseSchema/User.js';
 import User from '../src/Model/User.js';
 import { handlers } from '../src/Enum.js';
+import { useDb } from '../src/Helpers.js';
 dotenv.config();
 
 await databaseConnect();
@@ -35,9 +36,11 @@ if (andWord) {
     params.andWord = andWord;
 }
 
-await UserSchema.updateOne({ username, service }, { message: JSON.stringify(params) });
+await User.addMessage({ username, service }, params);
 
-const user = await UserSchema.findOne({ username, service }).exec();
-
-console.log(`Custom message was added to user (ID ${user._id.toString()})!`);
+if (useDb()) {
+    console.log(`Custom message was added to user (ID ${user._id.toString()})!`);
+} else {
+    console.log('Custom message was added to user');
+}
 process.exit(0);

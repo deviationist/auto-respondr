@@ -15,7 +15,7 @@ export default class User {
             this.id = id;
         }
         this.username = username;
-        this.password = password;
+        this.password = Buffer.from(password, 'base64').toString('utf8');
         this.service = service;
         this.cookies = cookies;
         this.message = message;
@@ -42,9 +42,44 @@ export default class User {
     async setCookies(cookies) {
         return await User.setCookiesStatic(useDb() ? this.id : this.username, cookies);
     }
+
+    static async addMessage({ username, service }, messageObject) {
+        if (useDb()) {
+            await UserSchema.updateOne({ username, service }, { message: JSON.stringify(messageObject) });   
+            return await UserSchema.findOne({ username, service }).exec();
+        } else {
+            return await User.updateUserInFile({ username, service }, { message: messageObject });
+        }
+    }
+
+    static async delete({ username, service }) {
+        if (useDb()) {
+            return await UserSchema.deleteOne({ username, service });
+        } else {
+            return await User.removeUserFromFile({ username, service });
+        }
+    }
+
+    static async create({ username, password, service }) {
+        const data = {
+            username,
+            password: Buffer.from(password, 'utf8').toString('base64'),
+            service,
+            active: true,
+        };
+        if (useDb()) {
+            return await UserSchema.create(data);
+        } else {
+            return await User.addUserToFile(data);
+        }        
+    }
     
     static async exists(username, service) {
-        return UserSchema.exists({ username, service });
+        if (useDb()) {
+            return UserSchema.exists({ username, service });
+        } else {
+            return (await User.getUsersFromFile(false)).filter(user => user.username == username && user.service == service).length > 0;
+        }
     }
     
     static async getUsers(onlyActive) {
@@ -90,6 +125,29 @@ export default class User {
 
     static async setCookiesInDb(userId, cookies) {
         return await UserSchema.findByIdAndUpdate(userId, { cookies: JSON.stringify(cookies) });
+    }
+
+    static async addUserToFile(user) {
+        let users = await User.getUsersFromFile(false);
+        users.push(user);
+        return User.writeUserToFile(users);
+    }
+
+    static async updateUserInFile({ username, service }, data) {
+        let users = await User.getUsersFromFile(false);
+        users = users.map((user) => {
+            if (user.username == username && user.service == service) {
+                user = {...user, ...data};
+            }
+            return user;
+        })
+        return User.writeUserToFile(users);
+    }
+
+    static async removeUserFromFile({ username, service }) {
+        let users = await User.getUsersFromFile(false);
+        users = users.filter(user => !(user.username == username && user.service == service));
+        return User.writeUserToFile(users);
     }
 
     static async setCookiesInFile(userId, cookies) {

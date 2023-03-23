@@ -17,7 +17,12 @@ export default class Config {
     }
 
     static write(config) {
-        return writeFileSync(Config.filePath, JSON.stringify(config, null, 4));
+        try {
+            writeFileSync(Config.filePath, JSON.stringify(config, null, 4))
+            return true;
+        } catch(e) {
+            return false;
+        }
     }
 
     static getUsers() {

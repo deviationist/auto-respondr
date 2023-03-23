@@ -5,7 +5,7 @@ Message auto-responder for Instagram and Facebook Messenger.
 1. Ensure that you have [installed the browser binaries](https://playwright.dev/docs/browsers#managing-browser-binaries).
 2. Run `npm install`
 3. Copy file `.env.example` to `.env` and fill in values (for MongoDB-setup only)
-4. Copy file `config-example.json` to `config.json` and fill in values
+4. Copy file `config-example.json` to `config.json` and fill in values.
 
 The users can either be configured in the JSON-file or in the Users-table in the MongoDB container.
 
@@ -15,11 +15,8 @@ The users can either be configured in the JSON-file or in the Users-table in the
 
 #### Adding/removing users
 Add a user - `npm run add-user your@email.com 'your-password' instagram` (valid services are instagram or facebook)
-Deleting a user - `npm run delete-user your@gmail.com instagram`
-
-### Non-MongoDB setup
-Add users in the `config.json`-file.
-
+Deleting a user - `npm run delete-user your@email.com instagram`
+Adding custom messages to a user - `npm run add-message your@email.com instagram "Hello,Hi" "I'm not using this service anymore! Please contact me on..." "&"`
 <hr>
 
 For development run `npm run dev` (automatic reload). For production `npm run start`.

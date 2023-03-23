@@ -1,6 +1,5 @@
 import * as dotenv from 'dotenv';
 import { databaseConnect } from '../src/Database.js';
-import UserSchema from '../src/DatabaseSchema/User.js';
 import User from '../src/Model/User.js';
 import { handlers } from '../src/Enum.js';
 dotenv.config();
@@ -24,7 +23,7 @@ if (!await User.exists(username, service)) {
     process.exit(1);
 }
 
-await UserSchema.deleteOne({
+await User.delete({
     username,
     service
 });
